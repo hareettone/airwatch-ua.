@@ -1,89 +1,211 @@
+
 <!DOCTYPE html>
-
 <html lang="uk">
-
 <head>
-
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
+<meta name="theme-color" content="#0b1016">
 <title>AIRWATCH UA</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <style>
+:root {
+  color-scheme: dark;
+  --bg: #0b1016;
+  --panel: #131b24;
+  --line: #2b3947;
+  --text: #eef3f8;
+  --muted: #9eacba;
+  --blue: #83b5e8;
+  --red: #701d2a;
+}
 
-body{margin:0;background:#0b1016;color:#eef3f8;font:16px Arial,sans-serif}
+* { box-sizing: border-box; }
 
-header{padding:16px;background:#131b24}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
 
-h1{margin:0 0 8px;color:#8bb8ef}
+header {
+  padding: 16px 18px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
 
-p{color:#aab8c5;font-size:13px}
+h1 {
+  margin: 0;
+  color: var(--blue);
+  font-size: 22px;
+  letter-spacing: 1.5px;
+}
 
-#map{height:75vh;min-height:400px;background:#dce5e8}
+.sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
 
-button{padding:10px;margin:8px;background:#202b36;color:white;border:1px solid #456;border-radius:8px}
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
 
+button {
+  padding: 9px 12px;
+  background: #202b36;
+  color: var(--text);
+  border: 1px solid #405163;
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:active { background: #2a3948; }
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  background: #0d141c;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.toggle input {
+  accent-color: var(--red);
+  width: 16px;
+  height: 16px;
+}
+
+.dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: rgba(112,29,42,.48);
+  border: 1px solid #a34d5b;
+}
+
+#map {
+  height: calc(100dvh - 165px);
+  min-height: 430px;
+  background: #111923;
+}
+
+footer {
+  padding: 10px 14px;
+  color: var(--muted);
+  font-size: 11px;
+  border-top: 1px solid var(--line);
+}
+
+#status {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.leaflet-container { background: #111923; }
+
+.leaflet-control-zoom a {
+  background: #131b24 !important;
+  color: #eef3f8 !important;
+  border-color: #344454 !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(11,16,22,.82) !important;
+  color: #aab8c5 !important;
+}
+
+.leaflet-control-attribution a {
+  color: #83b5e8 !important;
+}
+
+@media(max-width:600px) {
+  header { padding: 13px; }
+
+  #map {
+    height: calc(100dvh - 195px);
+    min-height: 390px;
+  }
+}
 </style>
-
 </head>
 
 <body>
-
 <header>
+  <h1>AIRWATCH UA</h1>
+  <div class="sub">Інтерактивна карта України · географічні шари</div>
 
-<h1>AIRWATCH UA</h1>
+  <div class="toolbar">
+    <button id="homeBtn" type="button">Вся Україна</button>
 
-<div>Інтерактивна карта України</div>
+    <label class="toggle">
+      <input id="occupiedToggle" type="checkbox" disabled>
+      <span class="dot"></span>
+      Окуповані території
+    </label>
+  </div>
 
-<p>Географічна карта · актуальні тривоги ще не підключені</p>
-
-<button onclick="home()">Вся Україна</button>
-
+  <div id="status" role="status">
+    Завантаження карти…
+  </div>
 </header>
 
-<div id="map"></div>
+<div id="map" aria-label="Інтерактивна карта України"></div>
+
+<footer>
+  Основа карти: © OpenStreetMap contributors, © CARTO.
+  Темна підкладка потребує інтернету.
+  Дані про окуповані території та повітряні тривоги ще не підключені.
+</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
+const map = L.map('map', {
+  zoomControl: true
+}).setView([48.7, 31.2], 6);
 
-const map=L.map('map').setView([48.7,31.2],6);
+// Темна картографічна підкладка
+L.tileLayer(
+  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  {
+    maxZoom: 20,
+    attribution:
+      '&copy; OpenStreetMap contributors &copy; CARTO'
+  }
+).addTo(map);
 
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+// Приблизні межі для кадрування всієї України
+const ukraineBounds = L.latLngBounds(
+  [[44.2, 22.0], [52.5, 40.5]]
+);
 
-maxZoom:19,
+// Кнопка повернення до всієї України
+document.getElementById('homeBtn').addEventListener('click', () => {
+  map.fitBounds(ukraineBounds, {
+    padding: [12, 12]
+  });
+});
 
-attribution:'© OpenStreetMap contributors'
+// Статус карти
+const statusEl = document.getElementById('status');
 
-}).addTo(map);
-
-let borders;
-
-const sources=[
-
-'https://raw.githubusercontent.com/deldesierto/ukraine-geojson/master/ukraine_admin_1.geojson',
-
-'https://raw.githubusercontent.com/darmat1/ukraine-geo-data/main/geodata/Ukraine.geojson'
-
-];
-
-async function loadBorders(){
-
-for(const url of sources){
-
-try{
-
-const response=await fetch(url);
-
-if(!response.ok)continue;
-
-const data=await response.json();
-
-if(!data.features)continue;
-
-borders=L.geoJSON(data,{
-
-style:{color:'#315d78',weight:1.5,fillColor:'#4b91b7',fillOpacity:0.12},
+map.whenReady(() => {
+  statusEl.textContent =
+    'Темна карта готова · шари подій ще не підключені';
+});
+</script>
+</body>
+</html>
